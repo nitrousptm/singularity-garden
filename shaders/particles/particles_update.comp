@@ -1,0 +1,172 @@
+#version 460 core
+// Compute Shader: Galaxy particle simulation
+// Runs: 1 invocation per particle
+// Particle count: up to 4,000,000 (configurable)
+
+#include "../common/noise.glsl"
+
+layout(local_size_x = 256) in;
+
+struct Particle {
+    vec4 pos;    // xyz=position, w=life
+    vec4 vel;    // xyz=velocity, w=mass
+    vec4 color;  // rgb=color, a=size
+};
+
+layout(std430, binding = 0) buffer ParticleBuffer {
+    Particle particles[];
+};
+
+uniform float uTime;
+uniform float uDeltaTime;
+uniform float uProgress;    // 0..1 scene progress
+uniform int   uMode;        // 0=galaxy, 1=nebula_flow, 2=singularity_collapse
+uniform int   uParticleCount;
+uniform float uBeatStrength;
+
+// Galaxy attractor constants
+const float GALAXY_MASS = 50.0;
+const float SPIRAL_ARMS = 2.0;
+
+// Initialize a new particle (called on first frame or when life expires)
+void spawnParticle(inout Particle p, uint id) {
+    float seed = float(id) * 0.00001 + uTime * 0.0001;
+
+    if (uMode == 0) {
+        // Galaxy spiral spawn
+        float arm    = float(int(id) % int(SPIRAL_ARMS));
+        float r      = sqrt(hash11(seed)) * 30.0;
+        float theta  = r * 0.5 + arm * 3.14159 + hash11(seed + 1.0) * 0.3;
+        float height = (hash11(seed + 2.0) - 0.5) * exp(-r * 0.1) * 2.0;
+
+        p.pos.xyz = vec3(cos(theta) * r, height, sin(theta) * r);
+        p.pos.w   = 1.0 + hash11(seed + 3.0) * 4.0;  // life
+
+        // Orbital velocity
+        float orbitalV = sqrt(GALAXY_MASS / max(r, 0.1)) * 0.8;
+        p.vel.xyz = vec3(-sin(theta), 0.0, cos(theta)) * orbitalV;
+        p.vel.xyz += (hash33(p.pos.xyz + seed) - 0.5) * 0.2;  // jitter
+        p.vel.w = hash11(seed + 5.0) + 0.5;  // mass
+
+        // Color: hot blue core → warm orange edges → red tail
+        float colorR = r / 30.0;
+        vec3 cCore = vec3(0.6, 0.8, 1.0);   // blue-white
+        vec3 cMid  = vec3(1.0, 0.7, 0.3);   // orange
+        vec3 cEdge = vec3(0.8, 0.2, 0.1);   // red
+        p.color.rgb = mix(mix(cCore, cMid, colorR), cEdge, pow(colorR, 2.0));
+        p.color.a   = mix(0.003, 0.001, colorR);  // size
+
+    } else if (uMode == 1) {
+        // Nebula flow: streams of gas
+        float r   = hash11(seed) * 20.0;
+        float phi = hash11(seed + 1.0) * 6.28318;
+        float theta = hash11(seed + 2.0) * 3.14159;
+        p.pos.xyz = vec3(sin(theta)*cos(phi), cos(theta), sin(theta)*sin(phi)) * r;
+        p.pos.w   = 2.0 + hash11(seed + 3.0) * 8.0;
+
+        float nebulaDensity = domainWarpFbm(p.pos.xyz * 0.1, 3);
+        p.vel.xyz = (hash33(p.pos.xyz) - 0.5) * nebulaDensity * 0.5;
+        p.vel.w   = 1.0;
+
+        vec3 nebCol = mix(vec3(0.2, 0.5, 1.0), vec3(1.0, 0.3, 0.8), nebulaDensity);
+        p.color.rgb = nebCol;
+        p.color.a   = 0.002;
+
+    } else {
+        // Singularity collapse: everything spiraling inward
+        float ang = hash11(seed) * 6.28318;
+        float r   = 10.0 + hash11(seed + 1.0) * 20.0;
+        float h   = (hash11(seed + 2.0) - 0.5) * 10.0;
+        p.pos.xyz = vec3(cos(ang)*r, h, sin(ang)*r);
+        p.pos.w   = 1.5 + hash11(seed + 3.0) * 3.0;
+
+        p.vel.xyz = normalize(-p.pos.xyz) * 2.0
+                  + vec3(-sin(ang), 0.0, cos(ang)) * 1.5;
+        p.vel.w   = 1.0;
+
+        float hue = hash11(seed + 4.0);
+        p.color.rgb = mix(vec3(0.1, 0.5, 1.0), vec3(1.0, 0.5, 0.0), hue);
+        p.color.a   = 0.002;
+    }
+}
+
+void main() {
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= uint(uParticleCount)) return;
+
+    Particle p = particles[id];
+
+    // Age particle
+    p.pos.w -= uDeltaTime * 0.1;
+
+    // Respawn if dead
+    if (p.pos.w <= 0.0) {
+        spawnParticle(p, id);
+        particles[id] = p;
+        return;
+    }
+
+    float dt = uDeltaTime;
+
+    if (uMode == 0) {
+        // Galaxy: N-body gravity approximation (galaxy + bulge)
+        vec3 pos = p.pos.xyz;
+        float r  = max(length(pos), 0.5);
+
+        // Central gravity
+        float grav = GALAXY_MASS / (r * r);
+        vec3 gravDir = -normalize(pos) * grav;
+
+        // Disk gravity (flatten to plane)
+        float diskGrav = GALAXY_MASS * 0.5 / (pos.y * pos.y + 1.0) * sign(-pos.y);
+
+        // Spiral arm density wave (parametric force)
+        float theta = atan(pos.z, pos.x);
+        float armPhase = mod(theta - r * 0.5 + uTime * 0.02, 6.28318);
+        float armForce = exp(-pow(armPhase, 2.0) * 10.0) + exp(-pow(armPhase - 6.28318, 2.0) * 10.0);
+        vec3 spiralDir = vec3(-sin(theta), 0.0, cos(theta)) * armForce * 0.3;
+
+        p.vel.xyz += (gravDir + vec3(0, diskGrav * 0.1, 0) + spiralDir) * dt;
+
+        // Damping (prevent runaway)
+        p.vel.xyz *= 0.999;
+
+    } else if (uMode == 1) {
+        // Nebula: curl noise flow
+        vec3 pos = p.pos.xyz;
+        vec3 grad = vec3(
+            vnoise3(pos + vec3(0.1, 0.0, 0.0)) - vnoise3(pos - vec3(0.1, 0.0, 0.0)),
+            vnoise3(pos + vec3(0.0, 0.1, 0.0)) - vnoise3(pos - vec3(0.0, 0.1, 0.0)),
+            vnoise3(pos + vec3(0.0, 0.0, 0.1)) - vnoise3(pos - vec3(0.0, 0.0, 0.1)));
+        // Curl = cross(∇f, ...)
+        vec3 curlForce = cross(grad, normalize(pos + 0.001)) * 0.5;
+        p.vel.xyz += curlForce * dt;
+        p.vel.xyz *= 0.99;
+
+    } else {
+        // Singularity collapse: stronger inward pull over time
+        vec3 dir = -normalize(p.pos.xyz + 0.001);
+        float dist = length(p.pos.xyz);
+        float pull = mix(1.0, 15.0, uProgress) / max(dist * dist, 0.5);
+        p.vel.xyz += dir * pull * dt;
+
+        // Rotation
+        float theta = atan(p.pos.z, p.pos.x);
+        vec3 tangent = vec3(-sin(theta), 0.0, cos(theta));
+        p.vel.xyz += tangent * 2.0 * dt;
+
+        // Beat: shockwave push
+        p.vel.xyz += normalize(p.pos.xyz) * uBeatStrength * 0.5 * dt;
+    }
+
+    // Integration
+    p.pos.xyz += p.vel.xyz * dt;
+
+    // Color update (temperature / velocity based)
+    float speed = length(p.vel.xyz);
+    vec3 hotColor  = vec3(1.0, 0.9, 0.7);  // fast = hot
+    vec3 coldColor = p.color.rgb;
+    p.color.rgb = mix(coldColor, hotColor, clamp(speed * 0.2, 0.0, 0.5));
+
+    particles[id] = p;
+}
