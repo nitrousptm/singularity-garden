@@ -64,8 +64,8 @@ vec2 bpmGlitch(vec2 uv, float beatPhase, float prog) {
 // -------- Hex-Grid mit Aktivierungswelle vom Zentrum --------
 float hexActivated(vec2 uv, float cellSize, float wave) {
     float dist = length(uv - 0.5);
-    float active = smoothstep(wave - 0.06, wave + 0.18, 0.85 - dist);
-    return hexGrid(uv, cellSize) * active;
+    float activation = smoothstep(wave - 0.06, wave + 0.18, 0.85 - dist);
+    return hexGrid(uv, cellSize) * activation;
 }
 
 // -------- BPM-Ripple vom Zentrum auf Hex-Grid --------
@@ -83,7 +83,7 @@ float electricArc(vec2 uv, float t, float seed) {
     float cellHash = hash11(col * 0.3713 + row * 0.1879 + seed);
 
     // Aktivierung wechselt mit Zeit (nicht jeder Frame)
-    float active = step(0.72, fract(cellHash + floor(t * 3.0) * 0.073));
+    float isActive = step(0.72, fract(cellHash + floor(t * 3.0) * 0.073));
 
     float lx = fract(uv.x * 28.0 + seed * 7.3);
     float ly = fract(uv.y * 16.0 + seed * 3.1);
@@ -93,7 +93,7 @@ float electricArc(vec2 uv, float t, float seed) {
     float arcH = exp(-abs(ly - 0.5 + noise) * 18.0);
     arcH *= step(0.06, lx) * step(lx, 0.94);
 
-    return active * arcH;
+    return isActive * arcH;
 }
 
 // -------- Datenströme mit Beat-Reaktion --------
