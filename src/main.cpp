@@ -288,9 +288,11 @@ int main(int, char**) {
         glEnable(GL_FRAMEBUFFER_SRGB);
 
         // ---- Scene name overlay ----
-        textRenderer.setColor(glm::vec3(0.85f, 0.85f, 0.95f));
+        textRenderer.setColor(glm::vec3(0.2f, 0.8f, 1.0f));  // bright cyan
         std::string sceneName = timeline.scenes[sceneID].name;
-        textRenderer.draw(sceneName, 1920.0f - sceneName.length() * 16.0f - 20.0f, 20.0f, 28.0f);
+        float textX = 1920.0f - sceneName.length() * 10.0f - 40.0f;
+        float textY = 60.0f;
+        textRenderer.draw(sceneName, textX, textY, 14.0f);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
