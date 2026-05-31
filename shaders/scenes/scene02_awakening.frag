@@ -101,7 +101,7 @@ float calcAO(vec3 pos, vec3 nor) {
     return clamp(1.0 - 2.8 * occ, 0.0, 1.0);
 }
 
-// -------- Volumetrische God Rays (verbessert, Beat-reaktiv) --------
+// -------- Volumetrische God Rays + Plasma-Wellen --------
 float godRays(vec3 ro, vec3 rd, vec3 lightPos, float boost) {
     float rays = 0.0, t = 0.3;
     for (int i = 0; i < 36; i++) {
@@ -114,6 +114,30 @@ float godRays(vec3 ro, vec3 rd, vec3 lightPos, float boost) {
         t += 0.42;
     }
     return rays;
+}
+
+// -------- Plasma-Wellen vom Core (neue Wow-Effekt) --------
+float plasmaWave(vec3 pos, float beatPhase, float beatStrength) {
+    float coreY = -1.8;
+    float r = length(vec2(pos.x, pos.z));
+    float waveR = beatPhase * 18.0;
+    float waveFront = abs(r - waveR) - 0.15 * (1.0 - beatPhase);
+    float plasma = exp(-waveFront * waveFront * 20.0) * (1.0 - beatPhase) * beatStrength * 1.8;
+
+    float heightDist = abs(pos.y - coreY);
+    float heightMod = exp(-heightDist * 0.08);
+    return plasma * heightMod;
+}
+
+// -------- Prismen-Licht-Brechung (Farb-Spektrum) --------
+vec3 prismLight(vec3 rd, float t, float progress) {
+    float hueShift = sin(rd.x * 15.0 + rd.y * 20.0 + t * 0.8) * 0.5 + 0.5;
+    vec3 spectrum = vec3(
+        sin(hueShift * 3.14 + 0.0) * 0.5 + 0.5,
+        sin(hueShift * 3.14 + 2.0) * 0.5 + 0.5,
+        sin(hueShift * 3.14 + 4.0) * 0.5 + 0.5
+    );
+    return spectrum * progress * 0.35;
 }
 
 // -------- BPM-Shockwave-Ringe auf dem Boden --------
@@ -295,6 +319,18 @@ void main() {
     vec3 rayCol = mix(vec3(0.18, 0.58, 1.0), vec3(0.38, 0.12, 1.0), uBarPhase);
     col += rayCol * rays1 * uProgress * 3.5;
     col += vec3(0.28, 0.48, 1.0) * rays2 * 1.8;
+
+    // === PLASMA-WELLEN + PRISMEN-LICHT (WOW-EFFEKT) ===
+    float plasma = 0.0;
+    for (int i = 0; i < 4; i++) {
+        vec3 wavePos = ro + rd * (t + float(i) * 2.0);
+        plasma += plasmaWave(wavePos, uBeatPhase, uBeatStrength) * 0.25;
+    }
+    vec3 plasmaCol = mix(vec3(0.0, 1.0, 0.5), vec3(1.0, 0.2, 1.0), uBarPhase * 0.6);
+    col += plasmaCol * plasma * 4.5;
+
+    // Prismen-Licht-Brechung
+    col += prismLight(rd, uTime, uProgress);
 
     // === BPM-SCREEN-FLASH ===
     float barFlash  = pow(max(0.0, 1.0 - uBarPhase  * 7.0), 3.0) * 0.45

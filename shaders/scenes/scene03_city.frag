@@ -63,9 +63,9 @@ vec3 windowInterior(vec2 winUV, vec3 viewDir, vec3 N, float seed, float t) {
     float ceiling = smoothstep(0.78, 0.95, interiorUV.y) * 0.7;
     float desk    = step(0.62, hash12(floor(interiorUV * 2.5 + seed)));
 
-    // Flicker (TV, Neon-Röhren)
-    float rate    = hash11(seed + 0.33) * 10.0 + 2.0;
-    float flicker = step(0.07, fract(t * rate + hash11(seed))) * 0.85 + 0.15;
+    // Sanfter Flicker (TV, Neon-Röhren) — weniger aggressiv
+    float rate    = hash11(seed + 0.33) * 4.0 + 1.0;
+    float flicker = 0.8 + sin(t * rate + hash11(seed) * 6.28) * 0.15 + hash11(seed + t * 0.1) * 0.05;
 
     return roomColor * flicker * (1.0 - ceiling * 0.65) * (1.0 - desk * 0.35);
 }
@@ -123,7 +123,7 @@ vec3 brushedMetalSpec(vec3 N, vec3 V, vec3 L, float anisotropy) {
     return (D * G * F) / (4.0 * NdV * NdL + 0.001) * NdL;
 }
 
-// ---- Neon-Schild (komplex: Buchstaben-Segmente, Leuchthof) --------
+// ---- Neon-Schild (glatte Animation, kein Flimmern) --------
 vec3 neonSign(vec2 uv, float seed, float t, float corrupt) {
     // 7 Zeichen-Segmente breit, 3 Zeilen hoch
     float segW = 7.0, segH = 3.0;
@@ -135,12 +135,13 @@ vec3 neonSign(vec2 uv, float seed, float t, float corrupt) {
     float segHash  = hash12(vec2(col + seed * 19.3, row + seed * 7.1));
     float beatPulse = pow(max(0.0, 1.0 - uBeatPhase * 2.5), 2.0) * uBeatStrength;
 
-    // Zufälliges Ein-/Ausschalten (simuliert Buchstaben)
-    float onRate = hash11(seed + col * 0.31 + row * 0.71) * 6.0 + 1.0;
-    float on     = step(0.2, fract(segHash + t * onRate * 0.15));
+    // Sanfte Animation statt schnelles Blinken (smoothstep statt step)
+    float onRate = hash11(seed + col * 0.31 + row * 0.71) * 3.5 + 1.5;
+    float onCycle = fract(segHash + t * onRate * 0.08);
+    float on = smoothstep(0.1, 0.35, onCycle) * (1.0 - smoothstep(0.65, 0.9, onCycle));
 
-    // Korruptions-Flicker
-    float corruptFl = mix(1.0, step(0.18, fract(t * 14.0 + segHash)), corrupt * 0.85);
+    // Sanfter Korruptions-Glitch (nicht so intensiv)
+    float corruptFl = mix(1.0, smoothstep(0.25, 0.35, fract(t * 6.0 + segHash)), corrupt * 0.5);
     on *= corruptFl;
 
     // Neon-Farben pro Gebäude: wählt aus 4 Paletten
@@ -162,11 +163,12 @@ vec3 neonSign(vec2 uv, float seed, float t, float corrupt) {
                 * step(0.5, hash11(segHash + 0.1));
     float shape = max(inner * 0.6, vBar);
 
-    // Leuchthof
-    float glow = exp(-min(lx, 1.0 - lx) * 12.0) * exp(-min(ly, 1.0 - ly) * 12.0) * 0.4;
+    // Leuchthof mit Halo-Effekt
+    float glow = exp(-min(lx, 1.0 - lx) * 12.0) * exp(-min(ly, 1.0 - ly) * 12.0) * 0.5;
+    float halo = exp(-min(lx, 1.0 - lx) * 4.5) * exp(-min(ly, 1.0 - ly) * 4.5) * 0.15;
 
-    float brightness = 2.8 + beatPulse * 1.2;
-    return neonColor * (shape + glow) * on * brightness;
+    float brightness = 3.2 + beatPulse * 1.5;
+    return neonColor * ((shape + glow) * on + halo * on * 0.6) * brightness;
 }
 
 // ---- Kristalline Korruptions-Emission --------
@@ -199,6 +201,20 @@ vec3 cityFog(float dist, float height, float corrupt) {
     vec3  nightSmog   = mix(vec3(0.055, 0.020, 0.010), vec3(0.020, 0.040, 0.012), corrupt);
     vec3  corruptSmog = mix(vec3(0.025, 0.008, 0.040), vec3(0.0, 0.060, 0.020), corrupt);
     return mix(nightSmog, corruptSmog, groundFog * corrupt * 0.7);
+}
+
+// ---- Dramatische Lichtstrahlen zwischen Gebäuden --------
+float cityLightBeams(vec3 worldPos, float t, float beatBoost) {
+    float beamPattern = sin(worldPos.x * 0.35 + t * 0.3) * 0.5 + 0.5;
+    float beam = exp(-abs(worldPos.z - sin(t * 0.15) * 8.0) * 0.18);
+    return beam * beamPattern * (0.3 + beatBoost * 0.7);
+}
+
+// ---- Digitale Glitch-Effekte (Korruption-Sichtbar) --------
+float digitalGlitch(vec3 worldPos, float t, float corrupt) {
+    float glitch = smoothstep(0.4, 0.6, fract(worldPos.y * 0.5 + t * 8.0 * corrupt));
+    float scanline = sin(worldPos.y * 30.0 + t * 20.0) * 0.5 + 0.5;
+    return glitch * scanline * corrupt * 0.4;
 }
 
 // ============================================================
@@ -406,6 +422,14 @@ void main() {
     // BPM Bar-Flash (globale Aufhellung bei Bar-Start)
     shading += mix(vec3(0.08, 0.04, 0.25), vec3(0.0, 0.15, 0.08), corrupt)
              * barPulse * 0.45;
+
+    // ---- DRAMATISCHE LICHTSTRAHLEN ----
+    float beams = cityLightBeams(vWorldPos, uTime, beatBoost);
+    shading += vec3(0.15, 0.35, 1.0) * beams * 1.5;
+
+    // ---- DIGITALE GLITCH-EFFEKTE ----
+    float glitch = digitalGlitch(vWorldPos, uTime, corrupt);
+    shading += mix(vec3(0.0, 1.0, 0.3), vec3(1.0, 0.0, 0.8), sin(uTime * 4.0) * 0.5 + 0.5) * glitch;
 
     // ---- ATMOSPHÄREN-NEBEL ----
     float dist      = length(uCameraPos - vWorldPos);
