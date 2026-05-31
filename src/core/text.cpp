@@ -1,131 +1,249 @@
 #include "core/text.h"
 #include <glm/gtc/matrix_transform.hpp>
-#include <cmath>
+#include <cstdio>
+#include <cstring>
 #include <vector>
 
-bool TextRenderer::init() {
-    const char* vertSrc = R"glsl(
+// 5x7 bitmap font, column-major, 1 byte per column, bit6=top, bit0=bottom.
+// Covers ASCII 0x20 (space) through 0x7E (~). Index = (ch - 0x20) * 5.
+static const uint8_t FONT5X7[480] = {
+    0x00,0x00,0x00,0x00,0x00, // ' '
+    0x00,0x00,0x5F,0x00,0x00, // '!'
+    0x00,0x07,0x00,0x07,0x00, // '"'
+    0x14,0x7F,0x14,0x7F,0x14, // '#'
+    0x24,0x2A,0x7F,0x2A,0x12, // '$'
+    0x23,0x13,0x08,0x64,0x62, // '%'
+    0x36,0x49,0x55,0x22,0x50, // '&'
+    0x00,0x05,0x03,0x00,0x00, // '\''
+    0x00,0x1C,0x22,0x41,0x00, // '('
+    0x00,0x41,0x22,0x1C,0x00, // ')'
+    0x14,0x08,0x3E,0x08,0x14, // '*'
+    0x08,0x08,0x3E,0x08,0x08, // '+'
+    0x00,0x50,0x30,0x00,0x00, // ','
+    0x08,0x08,0x08,0x08,0x08, // '-'
+    0x00,0x60,0x60,0x00,0x00, // '.'
+    0x20,0x10,0x08,0x04,0x02, // '/'
+    0x3E,0x51,0x49,0x45,0x3E, // '0'
+    0x00,0x42,0x7F,0x40,0x00, // '1'
+    0x42,0x61,0x51,0x49,0x46, // '2'
+    0x21,0x41,0x45,0x4B,0x31, // '3'
+    0x18,0x14,0x12,0x7F,0x10, // '4'
+    0x27,0x45,0x45,0x45,0x39, // '5'
+    0x3C,0x4A,0x49,0x49,0x30, // '6'
+    0x01,0x71,0x09,0x05,0x03, // '7'
+    0x36,0x49,0x49,0x49,0x36, // '8'
+    0x06,0x49,0x49,0x29,0x1E, // '9'
+    0x00,0x36,0x36,0x00,0x00, // ':'
+    0x00,0x56,0x36,0x00,0x00, // ';'
+    0x08,0x14,0x22,0x41,0x00, // '<'
+    0x14,0x14,0x14,0x14,0x14, // '='
+    0x00,0x41,0x22,0x14,0x08, // '>'
+    0x02,0x01,0x51,0x09,0x06, // '?'
+    0x32,0x49,0x79,0x41,0x3E, // '@'
+    0x7E,0x11,0x11,0x11,0x7E, // 'A'
+    0x7F,0x49,0x49,0x49,0x36, // 'B'
+    0x3E,0x41,0x41,0x41,0x22, // 'C'
+    0x7F,0x41,0x41,0x22,0x1C, // 'D'
+    0x7F,0x49,0x49,0x49,0x41, // 'E'
+    0x7F,0x09,0x09,0x09,0x01, // 'F'
+    0x3E,0x41,0x49,0x49,0x7A, // 'G'
+    0x7F,0x08,0x08,0x08,0x7F, // 'H'
+    0x00,0x41,0x7F,0x41,0x00, // 'I'
+    0x20,0x40,0x41,0x3F,0x01, // 'J'
+    0x7F,0x08,0x14,0x22,0x41, // 'K'
+    0x7F,0x40,0x40,0x40,0x40, // 'L'
+    0x7F,0x02,0x0C,0x02,0x7F, // 'M'
+    0x7F,0x04,0x08,0x10,0x7F, // 'N'
+    0x3E,0x41,0x41,0x41,0x3E, // 'O'
+    0x7F,0x09,0x09,0x09,0x06, // 'P'
+    0x3E,0x41,0x51,0x21,0x5E, // 'Q'
+    0x7F,0x09,0x19,0x29,0x46, // 'R'
+    0x46,0x49,0x49,0x49,0x31, // 'S'
+    0x01,0x01,0x7F,0x01,0x01, // 'T'
+    0x3F,0x40,0x40,0x40,0x3F, // 'U'
+    0x1F,0x20,0x40,0x20,0x1F, // 'V'
+    0x3F,0x40,0x38,0x40,0x3F, // 'W'
+    0x63,0x14,0x08,0x14,0x63, // 'X'
+    0x07,0x08,0x70,0x08,0x07, // 'Y'
+    0x61,0x51,0x49,0x45,0x43, // 'Z'
+    0x00,0x7F,0x41,0x41,0x00, // '['
+    0x02,0x04,0x08,0x10,0x20, // '\'
+    0x00,0x41,0x41,0x7F,0x00, // ']'
+    0x04,0x02,0x01,0x02,0x04, // '^'
+    0x40,0x40,0x40,0x40,0x40, // '_'
+    0x00,0x01,0x02,0x04,0x00, // '`'
+    0x20,0x54,0x54,0x54,0x78, // 'a'
+    0x7F,0x48,0x44,0x44,0x38, // 'b'
+    0x38,0x44,0x44,0x44,0x20, // 'c'
+    0x38,0x44,0x44,0x48,0x7F, // 'd'
+    0x38,0x54,0x54,0x54,0x18, // 'e'
+    0x08,0x7E,0x09,0x01,0x02, // 'f'
+    0x0C,0x52,0x52,0x52,0x3E, // 'g'
+    0x7F,0x08,0x04,0x04,0x78, // 'h'
+    0x00,0x44,0x7D,0x40,0x00, // 'i'
+    0x20,0x40,0x44,0x3D,0x00, // 'j'
+    0x7F,0x10,0x28,0x44,0x00, // 'k'
+    0x00,0x41,0x7F,0x40,0x00, // 'l'
+    0x7C,0x04,0x18,0x04,0x78, // 'm'
+    0x7C,0x08,0x04,0x04,0x78, // 'n'
+    0x38,0x44,0x44,0x44,0x38, // 'o'
+    0x7C,0x14,0x14,0x14,0x08, // 'p'
+    0x08,0x14,0x14,0x18,0x7C, // 'q'
+    0x7C,0x08,0x04,0x04,0x08, // 'r'
+    0x48,0x54,0x54,0x54,0x20, // 's'
+    0x04,0x3F,0x44,0x40,0x20, // 't'
+    0x3C,0x40,0x40,0x20,0x7C, // 'u'
+    0x1C,0x20,0x40,0x20,0x1C, // 'v'
+    0x3C,0x40,0x30,0x40,0x3C, // 'w'
+    0x44,0x28,0x10,0x28,0x44, // 'x'
+    0x0C,0x50,0x50,0x50,0x3C, // 'y'
+    0x44,0x64,0x54,0x4C,0x44, // 'z'
+    0x00,0x08,0x36,0x41,0x00, // '{'
+    0x00,0x00,0x7F,0x00,0x00, // '|'
+    0x00,0x41,0x36,0x08,0x00, // '}'
+    0x10,0x08,0x08,0x10,0x08, // '~'
+    0x00,0x00,0x00,0x00,0x00, // DEL (unused)
+};
+
+bool TextRenderer::init(int screenW, int screenH) {
+    sw = screenW; sh = screenH;
+
+    const char* vsrc = R"glsl(
     #version 460 core
     layout(location=0) in vec2 pos;
-    out vec2 uv;
-
-    uniform mat4 proj;
-
-    void main() {
-        gl_Position = proj * vec4(pos, 0.0, 1.0);
-        uv = pos;
-    }
+    void main() { gl_Position = vec4(pos, 0.0, 1.0); }
     )glsl";
 
-    const char* fragSrc = R"glsl(
+    // Fragment shader: sample the 5x7 font texture to draw each glyph.
+    // We pass the full text as an int[64] uniform.
+    const char* fsrc = R"glsl(
     #version 460 core
-    in vec2 uv;
     out vec4 outColor;
 
-    uniform vec3 textColor;
+    uniform sampler1D fontTex;   // 480 R8 texels (96 chars * 5 cols)
+    uniform int  chars[64];
+    uniform int  textLen;
+    uniform vec2 textPos;        // bottom-left of text block, screen pixels
+    uniform float scale;         // pixel size of one font pixel
+    uniform vec3 col;
+    uniform vec2 screenSize;
 
     void main() {
-        outColor = vec4(textColor, 0.9);
+        // Convert to screen coords (origin = bottom-left)
+        vec2 fc = vec2(gl_FragCoord.x, gl_FragCoord.y);
+        vec2 p  = fc - textPos;
+
+        float cw = scale * 6.0; // char advance: 5 px wide + 1 gap
+        float ch = scale * 7.0;
+
+        if (p.x < 0.0 || p.y < 0.0 || p.y >= ch) discard;
+
+        int ci = int(p.x / cw);
+        if (ci >= textLen) discard;
+
+        float cx = p.x - float(ci) * cw;
+        float cy = p.y;
+
+        int col5 = int(cx / scale);
+        int row7 = 6 - int(cy / scale); // bit 6 = top row
+
+        if (col5 >= 5 || row7 < 0 || row7 > 6) discard;
+
+        int ch_code = chars[ci];
+        if (ch_code < 32 || ch_code > 126) discard;
+
+        // Fetch column byte from 1D texture
+        int texIdx = (ch_code - 32) * 5 + col5;
+        int colByte = int(texelFetch(fontTex, texIdx, 0).r * 255.0 + 0.5);
+
+        if (((colByte >> row7) & 1) == 0) discard;
+
+        // Soft shadow: draw black shadow 1 scale-px below-left, then main color
+        outColor = vec4(col, 1.0);
     }
     )glsl";
 
-    GLuint vert = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vert, 1, &vertSrc, nullptr);
-    glCompileShader(vert);
+    auto compile = [](GLenum type, const char* src) -> GLuint {
+        GLuint s = glCreateShader(type);
+        glShaderSource(s, 1, &src, nullptr);
+        glCompileShader(s);
+        int ok; glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
+        if (!ok) {
+            char log[512]; glGetShaderInfoLog(s, 512, nullptr, log);
+            printf("[Text] Shader error: %s\n", log);
+        }
+        return s;
+    };
 
-    GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(frag, 1, &fragSrc, nullptr);
-    glCompileShader(frag);
+    GLuint vs = compile(GL_VERTEX_SHADER, vsrc);
+    GLuint fs = compile(GL_FRAGMENT_SHADER, fsrc);
 
-    textShader = glCreateProgram();
-    glAttachShader(textShader, vert);
-    glAttachShader(textShader, frag);
-    glLinkProgram(textShader);
+    shader = glCreateProgram();
+    glAttachShader(shader, vs);
+    glAttachShader(shader, fs);
+    glLinkProgram(shader);
+    glDeleteShader(vs); glDeleteShader(fs);
 
-    glDeleteShader(vert);
-    glDeleteShader(frag);
-
-    int success;
-    glGetProgramiv(textShader, GL_LINK_STATUS, &success);
-    if (!success) {
-        char log[512];
-        glGetProgramInfoLog(textShader, 512, nullptr, log);
-        printf("[TextRenderer] Shader link failed: %s\n", log);
+    int ok; glGetProgramiv(shader, GL_LINK_STATUS, &ok);
+    if (!ok) {
+        char log[512]; glGetProgramInfoLog(shader, 512, nullptr, log);
+        printf("[Text] Link error: %s\n", log);
         return false;
     }
 
-    glCreateVertexArrays(1, &fontVAO);
-    glCreateBuffers(1, &fontVBO);
-    glBindVertexArray(fontVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, fontVBO);
-    glBufferData(GL_ARRAY_BUFFER, 65536 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
+    // Full-screen triangle VAO (we use gl_FragCoord in the shader)
+    float tri[6] = { -1,-1, 3,-1, -1,3 };
+    glCreateVertexArrays(1, &vao);
+    glCreateBuffers(1, &vbo);
+    glNamedBufferData(vbo, sizeof(tri), tri, GL_STATIC_DRAW);
+    glVertexArrayVertexBuffer(vao, 0, vbo, 0, 2*sizeof(float));
+    glEnableVertexArrayAttrib(vao, 0);
+    glVertexArrayAttribFormat(vao, 0, 2, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayAttribBinding(vao, 0, 0);
 
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2*sizeof(float), (void*)0);
-
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
+    buildFontTexture();
     return true;
 }
 
-void TextRenderer::createFontTexture() {
-    // Not used in simple quad approach
+void TextRenderer::buildFontTexture() {
+    glCreateTextures(GL_TEXTURE_1D, 1, &fontTex);
+    glTextureStorage1D(fontTex, 1, GL_R8, 480);
+    glTextureSubImage1D(fontTex, 0, 0, 480, GL_RED, GL_UNSIGNED_BYTE, FONT5X7);
+    glTextureParameteri(fontTex, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTextureParameteri(fontTex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 
-void TextRenderer::draw(const std::string& text, float x, float y, float size) {
+void TextRenderer::draw(const std::string& text, float x, float y, float scale) {
     if (text.empty()) return;
 
-    // Build vertex buffer: each character as a colored rectangle
-    std::vector<float> verts;
-    float px = x;
+    int len = (int)text.size();
+    if (len > 64) len = 64;
 
-    for (char ch : text) {
-        if (ch == ' ') {
-            px += size * 0.5f;
-            continue;
-        }
+    int ci[64] = {};
+    for (int i = 0; i < len; i++) ci[i] = (unsigned char)text[i];
 
-        // Draw char as a quad (2 triangles)
-        float w = size * 0.6f;
-        float h = size;
-
-        // Triangle 1
-        verts.push_back(px);        verts.push_back(y);
-        verts.push_back(px + w);    verts.push_back(y);
-        verts.push_back(px);        verts.push_back(y + h);
-
-        // Triangle 2
-        verts.push_back(px + w);    verts.push_back(y);
-        verts.push_back(px + w);    verts.push_back(y + h);
-        verts.push_back(px);        verts.push_back(y + h);
-
-        px += w;
-    }
-
-    if (verts.empty()) return;
-
-    glUseProgram(textShader);
-    glUniform3fv(glGetUniformLocation(textShader, "textColor"), 1, &textColor[0]);
-
-    glm::mat4 proj = glm::ortho(0.0f, 1920.0f, 0.0f, 1080.0f, -1.0f, 1.0f);
-    glUniformMatrix4fv(glGetUniformLocation(textShader, "proj"), 1, GL_FALSE, &proj[0][0]);
-
-    glBindVertexArray(fontVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, fontVBO);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, verts.size() * sizeof(float), verts.data());
+    glUseProgram(shader);
+    glBindTextureUnit(0, fontTex);
+    glUniform1i(glGetUniformLocation(shader, "fontTex"), 0);
+    glUniform1iv(glGetUniformLocation(shader, "chars"), len, ci);
+    glUniform1i(glGetUniformLocation(shader, "textLen"), len);
+    glUniform2f(glGetUniformLocation(shader, "textPos"), x, y);
+    glUniform1f(glGetUniformLocation(shader, "scale"), scale);
+    glUniform3fv(glGetUniformLocation(shader, "col"), 1, &color[0]);
+    glUniform2f(glGetUniformLocation(shader, "screenSize"), (float)sw, (float)sh);
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(verts.size() / 2));
-    glDisable(GL_BLEND);
-
+    glBindVertexArray(vao);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
+    glDisable(GL_BLEND);
     glUseProgram(0);
 }
 
 void TextRenderer::destroy() {
-    if (fontVAO) glDeleteVertexArrays(1, &fontVAO);
-    if (fontVBO) glDeleteBuffers(1, &fontVBO);
-    if (textShader) glDeleteProgram(textShader);
+    if (shader)  glDeleteProgram(shader);
+    if (vao)     glDeleteVertexArrays(1, &vao);
+    if (vbo)     glDeleteBuffers(1, &vbo);
+    if (fontTex) glDeleteTextures(1, &fontTex);
 }

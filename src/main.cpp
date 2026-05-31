@@ -125,7 +125,7 @@ int main(int, char**) {
 
     // ---- Text Renderer ----
     TextRenderer textRenderer;
-    if (!textRenderer.init()) { fprintf(stderr, "TextRenderer init failed\n"); return 1; }
+    if (!textRenderer.init(W, H)) { fprintf(stderr, "TextRenderer init failed\n"); return 1; }
 
     // ---- Audio ----
     AudioSystem audio;
@@ -287,12 +287,17 @@ int main(int, char**) {
         );
         glEnable(GL_FRAMEBUFFER_SRGB);
 
-        // ---- Scene name overlay ----
-        textRenderer.setColor(glm::vec3(0.2f, 0.8f, 1.0f));  // bright cyan
-        std::string sceneName = timeline.scenes[sceneID].name;
-        float textX = 1920.0f - sceneName.length() * 10.0f - 40.0f;
-        float textY = 60.0f;
-        textRenderer.draw(sceneName, textX, textY, 14.0f);
+        // ---- Scene name overlay (bottom-right) ----
+        {
+            textRenderer.setColor(glm::vec3(0.9f, 0.9f, 1.0f));
+            const std::string& sname = timeline.scenes[sceneID].name;
+            float scale = 3.0f; // each font pixel = 3 screen pixels → char = 18x21 px
+            float charAdvance = scale * 6.0f;
+            float textW = (float)sname.size() * charAdvance;
+            float textX = W - textW - 24.0f;
+            float textY = 24.0f;
+            textRenderer.draw(sname, textX, textY, scale);
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
