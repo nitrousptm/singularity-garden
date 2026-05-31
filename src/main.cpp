@@ -17,6 +17,7 @@
 #include "core/framebuffer.h"
 #include "core/mesh.h"
 #include "core/camera.h"
+#include "core/text.h"
 #include "audio/audio_system.h"
 #include "scene/timeline.h"
 #include "scene/scene.h"
@@ -121,6 +122,10 @@ int main(int, char**) {
     // ---- Post-FX ----
     PostFX postfx;
     if (!postfx.init(W, H)) { fprintf(stderr, "PostFX init failed\n"); return 1; }
+
+    // ---- Text Renderer ----
+    TextRenderer textRenderer;
+    if (!textRenderer.init()) { fprintf(stderr, "TextRenderer init failed\n"); return 1; }
 
     // ---- Audio ----
     AudioSystem audio;
@@ -282,6 +287,11 @@ int main(int, char**) {
         );
         glEnable(GL_FRAMEBUFFER_SRGB);
 
+        // ---- Scene name overlay ----
+        textRenderer.setColor(glm::vec3(0.85f, 0.85f, 0.95f));
+        std::string sceneName = timeline.scenes[sceneID].name;
+        textRenderer.draw(sceneName, 1920.0f - sceneName.length() * 16.0f - 20.0f, 20.0f, 28.0f);
+
         glfwSwapBuffers(window);
         glfwPollEvents();
 
@@ -297,6 +307,7 @@ int main(int, char**) {
     audio.stop();
     for (auto& s : scenes) s->destroy();
     postfx.destroy();
+    textRenderer.destroy();
     hdrFBO.destroy();
     hdrNextFBO.destroy();
 
