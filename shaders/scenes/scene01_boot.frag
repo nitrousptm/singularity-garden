@@ -4,7 +4,6 @@
 // Extended: multi-layer hex grids, branching circuit traces, recursive mandala,
 //           fractal noise fields, advanced BPM reactions, 12-layer data streams
 
-#include "../common/noise.glsl"
 #include "../common/sdf.glsl"
 
 in  vec2 vUV;
