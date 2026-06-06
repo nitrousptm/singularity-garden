@@ -501,9 +501,9 @@ void main() {
                      + cookTorrance(N,V,L5,albedo,m,r)*lc5;
             vec3 env = envLighting(N,V,albedo,m,r, vec3(0.12,0.06,0.25), vec3(0.06,0.02,0.12));
 
-            // Crystal glow emission
-            vec3 crystEmit = crystal*facet*3.0*(1.0+bp*1.5);
-            vec3 goldEmit  = gold*step(0.68,vein1)*0.5*ao;
+            // Crystal glow emission — enhanced
+            vec3 crystEmit = crystal*facet*4.2*(1.0+bp*2.0);
+            vec3 goldEmit  = gold*step(0.68,vein1)*0.8*ao;
 
             col = sh + env*ao*0.5 + crystEmit + goldEmit;
         }
@@ -512,7 +512,7 @@ void main() {
             float ringPulse = sin(atan(pos.z,pos.x)*8.0 + uTime*3.0)*0.5+0.5;
             vec3  ringCol   = mix(vec3(0.0,0.8,1.0), vec3(1.0,0.2,0.8), ringPulse);
             float fresnel   = pow(1.0-max(dot(N,V),0.0), 3.0);
-            col = ringCol*(2.0+fresnel*4.0+bp*2.0);
+            col = ringCol*(3.2+fresnel*6.0+bp*3.0);
         }
         else {
             // === GROUND: bio-luminescent moss ===
@@ -520,10 +520,10 @@ void main() {
             float gp2 = dwfbm(pos*0.8+uTime*0.02, 3);
             vec3  albedo = mix(vec3(0.06,0.04,0.10), vec3(0.14,0.08,0.18), gp1);
 
-            // Glow grid
+            // Glow grid — enhanced intensity
             vec2 grid = fract(pos.xz*0.5);
             float gLine = smoothstep(0.06,0.0,min(grid.x,grid.y))+smoothstep(0.06,0.0,min(1.0-grid.x,1.0-grid.y));
-            vec3 gridCol = mix(vec3(0.1,0.5,0.8), vec3(0.8,0.2,1.0), gp2)*gLine*0.4;
+            vec3 gridCol = mix(vec3(0.1,0.5,0.8), vec3(0.8,0.2,1.0), gp2)*gLine*0.7;
 
             vec3 sh = cookTorrance(N,V,L1,albedo,0.0,0.85)*lc1;
             col = sh + gridCol;

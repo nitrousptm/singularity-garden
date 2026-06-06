@@ -499,7 +499,7 @@ void main() {
         vec3 interior = windowInterior(wuv, viewDir, N, ws, uTime);
         float wmask   = wm * won * isWall;
         if (btype >= 0.5 && btype < 1.5) wmask *= 0.42;
-        emission += interior * wmask * (btype >= 4.5 ? 2.2 : 3.4);
+        emission += interior * wmask * (btype >= 4.5 ? 3.0 : 4.2);
     }
 
     // ─── NEON-KANTEN-TUBES ────────────────────────────────────────────────────
@@ -529,10 +529,10 @@ void main() {
             float bs  = isBb ? seed : hash11(seed + 9.3);
             vec3 holo = holoBillboard(buv, bs, uTime, corrupt, beat);
             if (isBb) {
-                emission += holo;
-                albedo = vec3(0.02);
+                emission += holo * 1.3;
+                albedo = vec3(0.01);
             } else {
-                emission += holo * 0.62;
+                emission += holo * 0.85;
             }
         }
     }

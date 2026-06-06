@@ -907,7 +907,7 @@ CameraState buildCamera(vec2 ndc, float progress, float t) {
     }
     cam.fov = radians(baseFOV);
 
-    cam.lensDistort = smoothstep(0.45, 0.75, progress) * 0.15;
+    cam.lensDistort = smoothstep(0.45, 0.75, progress) * 0.25;
 
     vec3 target = vec3(0.0);
     vec3 fwd   = normalize(target - cam.ro);

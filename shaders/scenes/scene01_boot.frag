@@ -646,8 +646,8 @@ void main() {
         col = mix(col, col*vec3(0.85,1.0,1.0)*(1.0+hs), hs*0.4);
     }
 
-    // Tone mapping (soft)
-    col = col / (col + 0.7) * 1.3;
+    // Tone mapping (enhanced contrast)
+    col = col / (col + 0.5) * 1.5;
 
     fragColor = vec4(col, 1.0);
 }

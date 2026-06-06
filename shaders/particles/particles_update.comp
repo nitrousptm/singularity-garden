@@ -53,8 +53,8 @@ void spawnParticle(inout Particle p, uint id) {
         vec3 cCore = vec3(0.6, 0.8, 1.0);   // blue-white
         vec3 cMid  = vec3(1.0, 0.7, 0.3);   // orange
         vec3 cEdge = vec3(0.8, 0.2, 0.1);   // red
-        p.color.rgb = mix(mix(cCore, cMid, colorR), cEdge, pow(colorR, 2.0));
-        p.color.a   = mix(0.003, 0.001, colorR);  // size
+        p.color.rgb = mix(mix(cCore, cMid, colorR), cEdge, pow(colorR, 2.0)) * 1.3;
+        p.color.a   = mix(0.005, 0.002, colorR);  // size — increased
 
     } else if (uMode == 1) {
         // Nebula flow: streams of gas
@@ -68,9 +68,9 @@ void spawnParticle(inout Particle p, uint id) {
         p.vel.xyz = (hash33(p.pos.xyz) - 0.5) * nebulaDensity * 0.5;
         p.vel.w   = 1.0;
 
-        vec3 nebCol = mix(vec3(0.2, 0.5, 1.0), vec3(1.0, 0.3, 0.8), nebulaDensity);
+        vec3 nebCol = mix(vec3(0.2, 0.5, 1.0), vec3(1.0, 0.3, 0.8), nebulaDensity) * 1.4;
         p.color.rgb = nebCol;
-        p.color.a   = 0.002;
+        p.color.a   = 0.003;
 
     } else {
         // Singularity collapse: everything spiraling inward
@@ -85,8 +85,8 @@ void spawnParticle(inout Particle p, uint id) {
         p.vel.w   = 1.0;
 
         float hue = hash11(seed + 4.0);
-        p.color.rgb = mix(vec3(0.1, 0.5, 1.0), vec3(1.0, 0.5, 0.0), hue);
-        p.color.a   = 0.002;
+        p.color.rgb = mix(vec3(0.1, 0.5, 1.0), vec3(1.0, 0.5, 0.0), hue) * 1.5;
+        p.color.a   = 0.003;
     }
 }
 

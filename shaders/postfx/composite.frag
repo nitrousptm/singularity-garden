@@ -156,12 +156,12 @@ float lensFlare(vec2 uv, float phase) {
 vec3 holyChromaticBurst(vec2 uv, float phase) {
     vec2  c       = uv - 0.5;
     float r       = length(c);
-    float burstStr = phase * 0.04 * (1.0 + r * 2.0);
+    float burstStr = phase * 0.08 * (1.0 + r * 2.5);
     vec2  offset  = normalize(c + 0.001) * burstStr;
 
-    float rC = texture(uScene, clamp(uv + offset * 1.5, 0.0, 1.0)).r;
+    float rC = texture(uScene, clamp(uv + offset * 2.2, 0.0, 1.0)).r;
     float gC = texture(uScene, uv).g;
-    float bC = texture(uScene, clamp(uv - offset * 1.0, 0.0, 1.0)).b;
+    float bC = texture(uScene, clamp(uv - offset * 1.8, 0.0, 1.0)).b;
     return vec3(rC, gC, bC);
 }
 
@@ -203,16 +203,16 @@ void main() {
             col.b = texture(uScene, uv - ca).b;
         }
 
-        // Bloom
+        // Bloom — intensified
         vec3 bloom = texture(uBloom, uv).rgb
-                   * (uBloomStrength + uBeatStrength * 0.6 + uHolyShitPhase * 2.0);
+                   * (uBloomStrength * 1.4 + uBeatStrength * 1.2 + uHolyShitPhase * 3.5);
         col += bloom;
 
-        // Lens Flares bei Holy Shit
+        // Lens Flares bei Holy Shit — enhanced
         if (uHolyShitPhase > 0.05) {
             float flare = lensFlare(uv, uHolyShitPhase);
             vec3 flareColor = mix(vec3(0.8, 0.9, 1.0), vec3(1.0, 0.8, 0.5), uHolyShitPhase);
-            col += flareColor * flare * 2.5;
+            col += flareColor * flare * 4.0;
         }
 
         // White Flash bei Holy-Shit Onset (wenn es stark einsetzt)
@@ -221,7 +221,7 @@ void main() {
     }
 
     // -------- Exposure --------
-    float exposureBoost = uExposure + uHolyShitPhase * 0.35;
+    float exposureBoost = uExposure + uHolyShitPhase * 0.55;
     col *= exposureBoost;
 
     // -------- ACES Tonemap --------

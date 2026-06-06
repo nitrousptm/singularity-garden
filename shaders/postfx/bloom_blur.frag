@@ -27,11 +27,11 @@ vec4 downsample(vec2 uv) {
     vec4 l = texture(uInput, uv + uTexelSize * vec2( 0,  2) * uRadius);
     vec4 m = texture(uInput, uv + uTexelSize * vec2( 2,  2) * uRadius);
 
-    return (d+e+i+j) * 0.5 / 4.0 +
-           (a+b+g+f) * 0.125 / 4.0 +
-           (b+c+h+g) * 0.125 / 4.0 +
-           (f+g+l+k) * 0.125 / 4.0 +
-           (g+h+m+l) * 0.125 / 4.0;
+    return (d+e+i+j) * 0.6 / 4.0 +
+           (a+b+g+f) * 0.15 / 4.0 +
+           (b+c+h+g) * 0.15 / 4.0 +
+           (f+g+l+k) * 0.15 / 4.0 +
+           (g+h+m+l) * 0.15 / 4.0;
 }
 
 vec4 upsample(vec2 uv) {

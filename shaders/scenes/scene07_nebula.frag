@@ -298,11 +298,11 @@ vec3 singularity(vec2 uv, float t, float progress, float beatBoost) {
               + vec3(0.3,0.7,1.0)*(jet1+jet2)*1.5
               + vec3(1.0,1.0,0.8)*hawking;
 
-    // BPM shockwave rings
+    // BPM shockwave rings — enhanced
     for(int i=0; i<4; i++) {
         float phase = fract(uTime*133.0/60.0/4.0 + float(i)*0.25)*0.8;
         float ring  = abs(r - phase);
-        col += exp(-ring*25.0)*uBeatStrength*0.4*vec3(0.3,0.6,1.0)/float(i+1);
+        col += exp(-ring*25.0)*uBeatStrength*0.7*vec3(0.3,0.6,1.0)/float(i+1);
     }
 
     return col*progress;
