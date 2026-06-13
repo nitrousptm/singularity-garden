@@ -203,13 +203,9 @@ int main(int, char**) {
         float hsPhase = smoothstepf(HS_START[sceneID], 1.0f, progress);
 
         // ---- Camera (für SDF-Szenen ohne eigene Kamera) ----
-        switch (sceneID) {
-            default:
-                cam.pos    = glm::vec3(0, 5, 15);
-                cam.target = glm::vec3(0, 0,  0);
-                cam.fovY   = 60.0f;
-                break;
-        }
+        cam.pos    = glm::vec3(0, 5, 15);
+        cam.target = glm::vec3(0, 0,  0);
+        cam.fovY   = 60.0f;
 
         // ---- PostFX per Szene ----
         // Bloom und Exposure dynamisch: Höher während Holy-Shit
